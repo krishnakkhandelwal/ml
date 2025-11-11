@@ -1,74 +1,89 @@
-# Assignment 04: SVM vs Decision Tree Classifier
+#include <stdio.h>
 
-# Import libraries
-import numpy as np
-import matplotlib.pyplot as plt
-from sklearn.datasets import load_breast_cancer
-from sklearn.model_selection import train_test_split
-from sklearn.svm import SVC
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.metrics import accuracy_score, mean_squared_error
+int main() {
+    int n, i;
+    int arrival_time[10], burst_time[10], process_id[10], remain[10];
+    int completion_time[10], turnaround_time[10], waiting_time[10];
+    int gantt_process[100], gantt_time[100];
+    float total_tat = 0, total_wt = 0;
 
-# Load dataset
-data = load_breast_cancer()
-X, y = data.data, data.target
+    // Input
+    printf("Enter number of processes: ");
+    scanf("%d", &n);
 
+    printf("Enter arrival time for each process:\n");
+    for (i = 0; i < n; i++) {
+        process_id[i] = i + 1;
+        printf("P%d: ", i + 1);
+        scanf("%d", &arrival_time[i]);
+    }
 
+    printf("Enter burst time for each process:\n");
+    for (i = 0; i < n; i++) {
+        printf("P%d: ", i + 1);
+        scanf("%d", &burst_time[i]);
+        remain[i] = burst_time[i];
+    }
 
+    // SRTF scheduling simulation
+    int time = 0, completed = 0, gc = 0;
+    while (completed < n) {
+        int idx = -1, min = 1e9;
+        for (i = 0; i < n; i++) {
+            if (arrival_time[i] <= time && remain[i] > 0 && remain[i] < min) {
+                min = remain[i];
+                idx = i;
+            }
+        }
 
+        if (idx != -1) {
+            if (gc == 0 || gantt_process[gc - 1] != process_id[idx]) {
+                gantt_process[gc] = process_id[idx];
+                gantt_time[gc] = time;
+                gc++;
+            }
+            remain[idx]--;
+            if (remain[idx] == 0) {
+                completed++;
+                completion_time[idx] = time + 1;
+                turnaround_time[idx] = completion_time[idx] - arrival_time[idx];
+                waiting_time[idx] = turnaround_time[idx] - burst_time[idx];
+                total_tat += turnaround_time[idx];
+                total_wt += waiting_time[idx];
+            }
+        }
+        time++;
+    }
+    gantt_time[gc] = time;
 
-# Split dataset into train and test sets
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    // Output Table (sorted by process ID)
+    printf("\nProcess\tAT\tBT\tCT\tTAT\tWT\n");
+    for (i = 0; i < n; i++) {
+        int id = i + 1;
+        int idx;
+        for (idx = 0; idx < n; idx++) {
+            if (process_id[idx] == id) break;
+        }
+        printf("P%d\t%d\t%d\t%d\t%d\t%d\n",
+               process_id[idx], arrival_time[idx], burst_time[idx],
+               completion_time[idx], turnaround_time[idx], waiting_time[idx]);
+    }
 
-# ----- SVM Classifier -----
-svm_clf = SVC(kernel='linear')
-svm_clf.fit(X_train, y_train)
-y_pred_svm = svm_clf.predict(X_test)
+    printf("\nAverage Turnaround Time: %.2f", total_tat / n);
+    printf("\nAverage Waiting Time   : %.2f\n", total_wt / n);
 
-# Performance of SVM
-acc_svm = accuracy_score(y_test, y_pred_svm)
-mse_svm = mean_squared_error(y_test, y_pred_svm)
+    // Gantt Chart
+    printf("\nGantt Chart:\n\n");
+    for (i = 0; i < gc; i++) {
+        printf("|  P%d  ", gantt_process[i]);
+    }
+    printf("|\n");
 
-# ----- Decision Tree Classifier -----
-dt_clf = DecisionTreeClassifier(random_state=42)
-dt_clf.fit(X_train, y_train)
-y_pred_dt = dt_clf.predict(X_test)
-# Performance of Decision Tree
-acc_dt = accuracy_score(y_test, y_pred_dt)
-mse_dt = mean_squared_error(y_test, y_pred_dt)
+    printf("%d", gantt_time[0]);
+    for (i = 1; i <= gc; i++) {
+        printf("     %d", gantt_time[i]);
+    }
+    printf("\n");
 
-# Print Results
-print("SVM Accuracy:", acc_svm)
-print("SVM Mean Squared Error:", mse_svm)
-print("Decision Tree Accuracy:", acc_dt)
-print("Decision Tree Mean Squared Error:", mse_dt)
-
-# ----- Comparison Visualization -----
-metrics = ['Accuracy', 'Mean Squared Error']
-svm_scores = [acc_svm, mse_svm]
-dt_scores = [acc_dt, mse_dt]
-
-x = np.arange(len(metrics))
-width = 0.35
-
-fig, ax = plt.subplots(figsize=(7,5))
-bars1 = ax.bar(x - width/2, svm_scores, width, label='SVM')
-bars2 = ax.bar(x + width/2, dt_scores, width, label='Decision Tree')
-
-ax.set_ylabel('Score')
-ax.set_title('Comparison of SVM and Decision Tree')
-ax.set_xticks(x)
-ax.set_xticklabels(metrics)
-ax.legend()
-
-# Adding values on top of bars
-for bars in [bars1, bars2]:
-    for bar in bars:
-        height = bar.get_height()
-        ax.annotate(f'{height:.3f}', 
-                    xy=(bar.get_x() + bar.get_width()/2, height),
-                    xytext=(0, 3), 
-                    textcoords="offset points",
-                    ha='center', va='bottom')
-
-plt.show()
+    return 0;
+}

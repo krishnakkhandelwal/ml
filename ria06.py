@@ -1,71 +1,73 @@
-# ML Assignment – 6
-# Title: Clustering Techniques implementation and performance evaluation
+#include <semaphore.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <pthread.h>
 
-# 1. Imports
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
+sem_t mut1;
+sem_t wrt;
+int sharedvar = 99;
+int readcount = 0;
 
-from sklearn.datasets import load_iris
-from sklearn.cluster import KMeans, SpectralClustering, DBSCAN
-from sklearn.metrics import silhouette_score, adjusted_rand_score
-from sklearn.decomposition import PCA
+void* writer(void* arg) {
+    int id = *(int*)arg;
+    printf("\nWriter %d is trying to enter CS", id);
 
-# 2. Load Dataset
-iris = load_iris()
-X = iris.data
-y_true = iris.target
-
-print("Shape of dataset:", X.shape)
-
-# 3. Reduce dimensions for visualization (PCA -> 2D)
-pca = PCA(n_components=2, random_state=42)
-X_pca = pca.fit_transform(X)
-
-# 4. Define models
-models = {
-    "KMeans": KMeans(n_clusters=3, random_state=42, n_init=10),
-    "Spectral": SpectralClustering(n_clusters=3, affinity='nearest_neighbors',
-                                   assign_labels='kmeans', random_state=42),
-    "DBSCAN": DBSCAN(eps=0.5, min_samples=5)
+    sem_wait(&wrt);
+    printf("\nWriter %d entered CS", id);
+    
+    sharedvar++;
+    printf("\nWriter %d updated shared variable to %d", id, sharedvar);
+    
+    sleep(1);
+    sem_post(&wrt);
+    printf("\nWriter %d left CS", id);
+    return NULL;
 }
 
-# 5. Train models & evaluate
-results = {}
-fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+void* reader(void* arg) {
+    int id = *(int*)arg;
 
-for i, (name, model) in enumerate(models.items()):
-    labels = model.fit_predict(X)
-    
-    # Handle DBSCAN case (can produce -1 for noise points)
-    if len(set(labels)) > 1:
-        silhouette = silhouette_score(X, labels)
-    else:
-        silhouette = -1  # invalid silhouette if only 1 cluster
-    
-    ari = adjusted_rand_score(y_true, labels)
-    
-    results[name] = {
-        "Silhouette Score": round(silhouette, 3),
-        "ARI (vs true labels)": round(ari, 3),
-        "Unique Clusters": len(set(labels))
+    sem_wait(&mut1);
+    readcount++;
+    if (readcount == 1)
+        sem_wait(&wrt);
+    sem_post(&mut1);
+
+    printf("\nReader %d is reading sharedvar = %d", id, sharedvar);
+    sleep(1);
+
+    sem_wait(&mut1);
+    readcount--;
+    if (readcount == 0)
+        sem_post(&wrt);
+    sem_post(&mut1);
+
+    printf("\nReader %d finished reading", id);
+    return NULL;
+}
+
+int main() {
+    int n, i;
+    printf("Enter the number of readers and writers: ");
+    scanf("%d", &n);
+
+    pthread_t readers[n], writers[n];
+    int ids[n];
+
+    sem_init(&mut1, 0, 1);
+    sem_init(&wrt, 0, 1);
+
+    for (i = 0; i < n; i++) {
+        ids[i] = i + 1;
+        pthread_create(&writers[i], NULL, writer, &ids[i]);
+        pthread_create(&readers[i], NULL, reader, &ids[i]);
     }
-    
-    # Visualization
-    axes[i].scatter(X_pca[:, 0], X_pca[:, 1], c=labels, cmap='viridis', s=40)
-    axes[i].set_title(f"{name} Clustering")
 
-plt.suptitle("Clustering Visualization on Iris Dataset", fontsize=14)
-plt.show()
+    for (i = 0; i < n; i++) {
+        pthread_join(writers[i], NULL);
+        pthread_join(readers[i], NULL);
+    }
 
-# 6. Results Table
-results_df = pd.DataFrame(results).T
-print("\n=== Clustering Performance Results ===")
-print(results_df)
-
-# 7. Heatmap for quick comparison
-plt.figure(figsize=(6, 4))
-sns.heatmap(results_df.iloc[:, :2], annot=True, cmap="YlGnBu", fmt=".3f")
-plt.title("Clustering Performance Comparison")
-plt.show()
+    return 0;
+}

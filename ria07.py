@@ -1,51 +1,106 @@
-# Assignment 7: Linear Regression Implementation
+#include <stdio.h>
 
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from sklearn.linear_model import LinearRegression, Ridge, Lasso
-from sklearn.model_selection import train_test_split
-from sklearn import metrics
+int main() {
+    int n, m;
+    printf("Enter number of processes: ");
+    scanf("%d", &n);
+    printf("Enter number of resource types: ");
+    scanf("%d", &m);
 
+    int Available[m];
+    int Max[n][m];
+    int Allocation[n][m];
+    int Need[n][m];
+    printf("Enter Available resources :\n");
+    for (int j = 0; j < m; j++) {
+        scanf("%d", &Available[j]);
+    }
 
-# custom dataset
-np.random.seed(42)
-X = np.linspace(5, 25, 25) + np.random.normal(0, 2, 25)
-y = 3*X + 8 + np.random.normal(0, 8, 25)
+    printf("Enter Max matrix (%d rows, %d columns):\n", n, m);
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < m; j++) {
+            scanf("%d", &Max[i][j]);
+        }
+    }
 
-# Convert to 2D shape for sklearn
-X = X.reshape(-1, 1)
+    printf("Enter Allocation matrix (%d rows, %d columns):\n", n, m);
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < m; j++) {
+            scanf("%d", &Allocation[i][j]);
+        }
+    }
 
-# ---------- Split into Train/Test ----------
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=10)
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < m; j++) {
+            Need[i][j] = Max[i][j] - Allocation[i][j];
+        }
+    }
 
-# ---------- Model Training ----------
-model = LinearRegression()
-model.fit(X_train, y_train)
+    printf("\nProcess\tAlloc\tMax\tNeed\n");
+    printf("\t");
+    for (int k = 0; k < m; k++) printf("A B C\t"); 
+    printf("\n");
 
-# ---------- Prediction ----------
-y_pred = model.predict(X_test)
+    for (int i = 0; i < n; i++) {
+        printf("P%d\t", i);
+        for (int j = 0; j < m; j++) printf("%d ", Allocation[i][j]);
+        printf("\t");
+        for (int j = 0; j < m; j++) printf("%d ", Max[i][j]);
+        printf("\t");
+        for (int j = 0; j < m; j++) printf("%d ", Need[i][j]);
+        printf("\n");
+    }
 
-# ---------- Output ----------
-print("Model Coefficient (Slope):", model.coef_[0])
-print("Model Intercept:", model.intercept_)
+    printf("\nAvailable resources:\n");
+    printf("A B C\n"); 
+    for (int j = 0; j < m; j++) printf("%d ", Available[j]);
+    printf("\n");
 
-# ---------- Plots ----------
-plt.figure(figsize=(8,5))
-plt.scatter(X_train, y_train, color='blue', label='Training Points')
-plt.scatter(X_test, y_test, color='orange', label='Validation Points')
-plt.plot(X, model.predict(X), color='green', label='Regression Line')
-plt.xlabel('X (feature)')
-plt.ylabel('y (target)')
-plt.title('Linear Regression Fit and Validation')
-plt.legend()
-plt.grid(True)
-plt.show()
+    //SAFETY ALGORITHM
+   
+    int finish[n], safeSeq[n], work[m];
+    for (int j = 0; j < m; j++)
+        work[j] = Available[j];
 
-# ---------- Metrics ----------
-print("Mean Absolute Error (MAE):", metrics.mean_absolute_error(y_test, y_pred))
-print("Mean Squared Error (MSE):", metrics.mean_squared_error(y_test, y_pred))
-print("Root Mean Squared Error (RMSE):", np.sqrt(metrics.mean_squared_error(y_test, y_pred)))
-print("R-squared Score (R²):", metrics.r2_score(y_test, y_pred))
+    for (int i = 0; i < n; i++)
+        finish[i] = 0;
 
+    int count = 0;
+    while (count < n) {
+        int found = 0;
+        for (int i = 0; i < n; i++) {
+            if (finish[i] == 0) {
+                int flag = 0;
+                for (int j = 0; j < m; j++) {
+                    if (Need[i][j] > work[j]) {
+                        flag = 1;
+                        break;
+                    }
+                }
+                if (flag == 0) {
+                    for (int j = 0; j < m; j++)
+                        work[j] += Allocation[i][j];
+
+                    safeSeq[count++] = i;
+                    finish[i] = 1;
+                    found = 1;
+                }
+            }
+        }
+        if (found == 0) {
+            printf("no process found deadlock situation");
+            printf("\nSystem is NOT in a safe state.\n");
+            return 0;
+        }
+    }
+
+    // Print Safe Sequence
+    printf("\nSystem is in a SAFE state.\nSafe sequence is: ");
+    for (int i = 0; i < n; i++) {
+        printf("P%d ", safeSeq[i]);
+    }
+    printf("\n");
+
+    return 0;
+}
 

@@ -1,65 +1,86 @@
-# Name : Krishna Khandelwal
-# PRN  : 1032232078
-# Roll : 50
-# TY BTECH CSE AIDS (PANEL A)
+#include <stdio.h>
 
-import pandas as pd
-from sklearn.model_selection import train_test_split, cross_val_score
-from sklearn.tree import DecisionTreeClassifier, plot_tree
-from sklearn.metrics import classification_report, confusion_matrix
-from sklearn.preprocessing import LabelEncoder
-import matplotlib.pyplot as plt
-import seaborn as sns
+int main() {
+    int n, i, j;
+    int arrival_time[10], burst_time[10], process_id[10];
+    int completion_time[10], turnaround_time[10], waiting_time[10];
+    int start_time;
+    float total_tat = 0, total_wt = 0;
 
-# ===================== Load Dataset =====================
-df = pd.read_csv("data_dt.csv")
+    printf("Enter number of processes: ");
+    scanf("%d", &n);
 
-# ===================== Encode Non-Numeric Columns =====================
-label_encoders = {}
-for column in df.columns:
-    if df[column].dtype == object:  # if column is categorical
-        le = LabelEncoder()
-        df[column] = le.fit_transform(df[column])
-        label_encoders[column] = le
+    printf("Enter arrival time for each process:\n");
+    for(i = 0; i < n; i++) {
+        process_id[i] = i;
+        printf("Process %d: ", i);
+        scanf("%d", &arrival_time[i]);
+    }
 
-# ===================== Split Features and Target =====================
-X = df.iloc[:, :-1]   # all columns except last as features
-y = df.iloc[:, -1]    # last column as target
+    printf("Enter burst time for each process:\n");
+    for(i = 0; i < n; i++) {
+        printf("Process %d: ", i);
+        scanf("%d", &burst_time[i]);
+    }
 
-# ===================== Train-Test Split =====================
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42
-)
+    for(i = 0; i < n - 1; i++) {
+        for(j = i + 1; j < n; j++) {
+            if(arrival_time[i] > arrival_time[j]) {
+                int temp = arrival_time[i];
+                arrival_time[i] = arrival_time[j];
+                arrival_time[j] = temp;
 
-# ===================== Decision Tree Model =====================
-clf = DecisionTreeClassifier(criterion="entropy", random_state=42)
-clf.fit(X_train, y_train)
+                temp = burst_time[i];
+                burst_time[i] = burst_time[j];
+                burst_time[j] = temp;
 
-# ===================== Predictions =====================
-y_pred = clf.predict(X_test)
+                temp = process_id[i];
+                process_id[i] = process_id[j];
+                process_id[j] = temp;
+            }
+        }
+    }
 
-# ===================== Classification Report =====================
-print("Classification Report:\n", classification_report(y_test, y_pred))
+    start_time = 0;
+    for(i = 0; i < n; i++) {
+        if(start_time < arrival_time[i])
+            start_time = arrival_time[i];
 
-# ===================== Confusion Matrix =====================
-plt.figure(figsize=(6,4))
-sns.heatmap(confusion_matrix(y_test, y_pred),
-            annot=True, cmap='Blues', fmt='d',
-            xticklabels=clf.classes_, yticklabels=clf.classes_)
-plt.xlabel("Predicted")
-plt.ylabel("Actual")
-plt.title("Decision Tree Confusion Matrix")
-plt.show()
+        completion_time[i] = start_time + burst_time[i];
+        turnaround_time[i] = completion_time[i] - arrival_time[i];
+        waiting_time[i] = turnaround_time[i] - burst_time[i];
 
-# ===================== K-Fold Cross Validation =====================
-scores = cross_val_score(clf, X, y, cv=5)
-print("Cross-validation scores:", scores)
-print("Average CV Accuracy:", scores.mean())
+        total_tat += turnaround_time[i];
+        total_wt += waiting_time[i];
 
-# ===================== Decision Tree Visualization =====================
-plt.figure(figsize=(15,10))
-plot_tree(clf, filled=True,
-          feature_names=X.columns,
-          class_names=[str(c) for c in clf.classes_])
-plt.title("Decision Tree Visualization")
-plt.show()
+        start_time = completion_time[i];
+    }
+
+    printf("\nResult Table (Sorted by Arrival Time):\n");
+    printf("Process\tAT\tBT\tCT\tTAT\tWT\n");
+    for(i = 0; i < n; i++) {
+        printf("P%d\t%d\t%d\t%d\t%d\t%d\n",
+               process_id[i], arrival_time[i], burst_time[i],
+               completion_time[i], turnaround_time[i], waiting_time[i]);
+    }
+
+    printf("\nAverage Turnaround Time: %.2f", total_tat / n);
+    printf("\nAverage Waiting Time   : %.2f\n", total_wt / n);
+
+    printf("\n---------------------------------------\n");
+    printf("Gantt Chart\n\n");
+
+    printf("|");
+    for(i = 0; i < n; i++) {
+        printf("  P%d  |", process_id[i]);
+    }
+
+    printf("\n0");
+    for(i = 0; i < n; i++) {
+        printf("     %d", completion_time[i]);
+    }
+
+    printf("\n");
+
+    return 0;
+}

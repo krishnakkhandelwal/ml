@@ -1,107 +1,103 @@
-# ML Assignment 5: Ensemble, Random Forest Classifier and Performance Measurement
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/ipc.h>
+#include <unistd.h>
+#define MAX 20
 
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
+// filedes[0]: read
+// filedes[1]: write
 
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import (
-    RandomForestClassifier, BaggingClassifier, AdaBoostClassifier,
-    GradientBoostingClassifier, StackingClassifier
-)
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import (
-    accuracy_score, confusion_matrix, classification_report,
-    roc_auc_score, roc_curve
-)
+int main() {
+    int filedes[2], n;
+    char string[MAX], line[MAX];
+    pid_t pid;
 
-# 1. Load dataset
-data = pd.read_csv("diabetes.csv")
-print("First 5 rows:\n", data.head())
-print("\nDataset Info:\n")
-print(data.info())
-print("\nMissing values:\n", data.isnull().sum())
+    printf("Enter string for parent: ");
+    fflush(stdin);
+    fgets(string, MAX, stdin);
 
-# 2. Features (X) and Target (y)
-X = data.drop("Outcome", axis=1)
-y = data["Outcome"]
-
-# 3. Standardization
-scaler = StandardScaler()
-X_scaled = scaler.fit_transform(X)
-
-# 4. Train-Test Split
-X_train, X_test, y_train, y_test = train_test_split(
-    X_scaled, y, test_size=0.3, random_state=42, stratify=y
-)
-
-# 5. Models
-models = {
-    "Decision Tree": DecisionTreeClassifier(random_state=42),
-    "Random Forest": RandomForestClassifier(n_estimators=100, random_state=42),
-    "Bagging": BaggingClassifier(estimator=DecisionTreeClassifier(), n_estimators=50, random_state=42),
-    "AdaBoost": AdaBoostClassifier(n_estimators=100, random_state=42),
-    "Gradient Boosting": GradientBoostingClassifier(n_estimators=100, random_state=42),
-    "Stacking": StackingClassifier(
-        estimators=[
-            ("rf", RandomForestClassifier(n_estimators=50, random_state=42)),
-            ("dt", DecisionTreeClassifier(random_state=42)),
-            ("ada", AdaBoostClassifier(random_state=42))
-        ],
-        final_estimator=LogisticRegression(),
-        passthrough=True
-    )
+    // if returns -1 -> fail
+    if (pipe(filedes) < 0) {
+        printf("\nPipe creation Error!");
+        exit(0);
+    }
+    if ((pid=fork()) < 0) {
+        printf("Fork error\n");
+        exit(0);
+    }
+    if (pid > 0) {
+        close(filedes[0]);
+        write(filedes[1], string, MAX);
+    }
+    if (pid == 0) {
+        close(filedes[1]);
+        n = read(filedes[0], line, MAX);
+        line[n] = '\0';
+        printf("Line read by child: %s\n", line);
+    }
+    exit(0);
 }
 
-# 6. Train & Evaluate
-results = {}
-for name, model in models.items():
-    model.fit(X_train, y_train)
-    y_pred = model.predict(X_test)
-    
-    acc = accuracy_score(y_test, y_pred)
-    cm = confusion_matrix(y_test, y_pred)
-    report = classification_report(y_test, y_pred)
-    roc_auc = roc_auc_score(y_test, model.predict_proba(X_test)[:,1])
-    
-    results[name] = acc
-    print("\n=== {} ===".format(name))
-    print("Accuracy:", acc)
-    print("ROC-AUC:", roc_auc)
-    print("Confusion Matrix:\n", cm)
-    print("Classification Report:\n", report)
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <unistd.h>
+#define MAX 20
 
-# 7. Compare Results
-results_df = pd.DataFrame.from_dict(results, orient="index", columns=["Accuracy"])
-print("\n=== Model Comparison ===")
-print(results_df)
+int main() {
+    int filedes1[2], filedes2[2], n;
+    char string[MAX], line[MAX];
+    pid_t pid;
 
-# 8. Plot Confusion Matrix (for best model)
-best_model_name = results_df["Accuracy"].idxmax()
-best_model = models[best_model_name]
-y_best_pred = best_model.predict(X_test)
-cm = confusion_matrix(y_test, y_best_pred)
+    // Create both pipes
+    if (pipe(filedes1) < 0 || pipe(filedes2) < 0) {
+        printf("\nPipe creation Error!");
+        exit(0);
+    }
 
-plt.figure(figsize=(6,4))
-sns.heatmap(cm, annot=True, fmt="d", cmap="Blues")
-plt.title(f"Confusion Matrix - {best_model_name}")
-plt.xlabel("Predicted")
-plt.ylabel("Actual")
-plt.show()
+    if ((pid = fork()) < 0) {
+        printf("Fork error\n");
+        exit(0);
+    }
 
-# 9. ROC Curves
-plt.figure(figsize=(8,6))
-for name, model in models.items():
-    y_prob = model.predict_proba(X_test)[:,1]
-    fpr, tpr, _ = roc_curve(y_test, y_prob)
-    plt.plot(fpr, tpr, label=f"{name}")
-    
-plt.plot([0,1],[0,1],"k--")
-plt.title("ROC Curves Comparison")
-plt.xlabel("False Positive Rate")
-plt.ylabel("True Positive Rate")
-plt.legend()
-plt.show()
+    if (pid > 0) {  //  Parent 
+        close(filedes1[1]); 
+        close(filedes2[0]); 
+
+        //  Read from child
+        n = read(filedes1[0], line, MAX);
+        line[n] = '\0';
+        printf("Parent read from child: %s\n", line);
+
+        //  Write to child
+        printf("Enter string for parent to send: ");
+        fflush(stdin);
+        fgets(string, MAX, stdin);
+        write(filedes2[1], string, MAX);
+
+        close(filedes1[0]);
+        close(filedes2[1]);
+    }
+    else {
+        // Child
+        close(filedes1[0]); 
+        close(filedes2[1]); // close write end of parent->child
+
+        // Child writes first
+        printf("Enter string for child to send: ");
+        fflush(stdin);
+        fgets(string, MAX, stdin);
+        write(filedes1[1], string, MAX);
+
+        // Then child reads response
+        n = read(filedes2[0], line, MAX);
+        line[n] = '\0';
+        printf("Child read from parent: %s\n", line);
+
+        close(filedes1[1]);
+        close(filedes2[0]);
+    }
+
+    exit(0);
+}
